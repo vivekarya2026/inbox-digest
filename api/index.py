@@ -25,6 +25,7 @@ from google_auth_oauthlib.flow import Flow
 from appwrite.client import Client
 from appwrite.services.databases import Databases
 from appwrite.id import ID
+from appwrite.query import Query
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("inbox-digest")
@@ -70,7 +71,7 @@ def _get_user(email: str) -> dict | None:
     try:
         db  = Databases(_appwrite_client())
         res = db.list_documents(AW_DB_ID, AW_COL_USERS,
-                                queries=[f'equal("email", "{email}")'])
+                                queries=[Query.equal("email", email)])
         docs = res.get("documents", [])
         return docs[0] if docs else None
     except Exception as e:
@@ -100,7 +101,7 @@ def _get_token_for_number(wa_number: str) -> str | None:
     try:
         db  = Databases(_appwrite_client())
         res = db.list_documents(AW_DB_ID, AW_COL_USERS,
-                                queries=[f'equal("wa_number", "{wa_number}")'])
+                                queries=[Query.equal("wa_number", wa_number)])
         docs = res.get("documents", [])
         return docs[0].get("gmail_token") if docs else None
     except Exception as e:
@@ -389,7 +390,17 @@ display:inline-block;margin-top:24px;font-weight:600}}</style></head>
 
     except Exception as e:
         log.error(f"OAuth callback error: {e}\n{traceback.format_exc()}")
-        return HTMLResponse(f"<h1>Error: {e}</h1>", status_code=500)
+        return HTMLResponse(f"""<!DOCTYPE html><html><head><title>Error</title>
+<style>body{{font-family:sans-serif;background:#0f0f0f;color:#f0f0f0;display:flex;
+align-items:center;justify-content:center;min-height:100vh;text-align:center}}
+.card{{max-width:500px;padding:40px}}.err{{background:#1a0000;border:1px solid #ff4444;
+padding:16px;border-radius:8px;color:#ff6666;font-family:monospace;font-size:0.85rem;
+text-align:left;white-space:pre-wrap;word-break:break-all}}</style></head>
+<body><div class="card"><h2>❌ Connection Failed</h2>
+<p style="color:#888;margin:16px 0">Error (share with developer):</p>
+<div class="err">{str(e)}</div>
+<p style="margin-top:24px"><a href="/connect" style="color:#4285f4">← Try again</a></p>
+</div></body></html>""", status_code=500)
 
 # ── WhatsApp webhook ──────────────────────────────────────────────────────────
 @app.get("/webhook")
