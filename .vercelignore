@@ -16,3 +16,5 @@ uv.lock
 pyproject.toml
 inbox-digest.egg-info/
 .python-version
+AGENTS.md
+onboarding/
