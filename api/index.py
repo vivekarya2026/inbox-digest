@@ -472,6 +472,51 @@ async def health():
     return {"status": "ok", "version": "1.0.0",
             "appwrite": bool(AW_PROJECT_ID), "app_url": APP_URL}
 
+# #region agent log
+@app.get("/debug/selftest")
+async def debug_selftest():
+    """Debug: exercises Appwrite write path (hypotheses A/E) without OAuth."""
+    import traceback as _tb
+    result = {
+        "diag": {
+            "aw_endpoint": AW_ENDPOINT,
+            "aw_project_len": len(AW_PROJECT_ID),
+            "aw_key_len": len(AW_API_KEY),
+            "aw_db": AW_DB_ID,
+            "aw_col": AW_COL_USERS,
+            "client_id_len": len(GMAIL_CLIENT_ID),
+            "client_id_tail": GMAIL_CLIENT_ID[-30:] if GMAIL_CLIENT_ID else "",
+            "secret_len": len(GMAIL_CLIENT_SECRET),
+            "app_url": APP_URL,
+            "scopes": GMAIL_SCOPES,
+        },
+        "stages": {},
+    }
+    # Stage 1: Appwrite client + list (hypothesis A)
+    try:
+        db = Databases(_appwrite_client())
+        res = db.list_documents(AW_DB_ID, AW_COL_USERS,
+                                queries=[Query.equal("email", "selftest@example.com")])
+        result["stages"]["appwrite_list"] = {"ok": True, "total": res.get("total", 0)}
+    except Exception as e:
+        result["stages"]["appwrite_list"] = {"ok": False, "error": str(e), "tb": _tb.format_exc()[-500:]}
+        return result
+    # Stage 2: Appwrite write (hypothesis E - attribute/size)
+    try:
+        existing = _get_user("selftest@example.com")
+        data = {"email": "selftest@example.com", "gmail_token": "x"*100,
+                "wa_number": "0000000000",
+                "updated_at": datetime.now(timezone.utc).isoformat()}
+        if existing:
+            db.update_document(AW_DB_ID, AW_COL_USERS, existing["$id"], data)
+        else:
+            db.create_document(AW_DB_ID, AW_COL_USERS, ID.unique(), data)
+        result["stages"]["appwrite_write"] = {"ok": True}
+    except Exception as e:
+        result["stages"]["appwrite_write"] = {"ok": False, "error": str(e), "tb": _tb.format_exc()[-500:]}
+    return result
+# #endregion
+
 # Vercel serverless handler
 from mangum import Mangum
 handler = Mangum(app, lifespan="off")
