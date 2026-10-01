@@ -34,8 +34,12 @@ WA_TOKEN     = os.environ.get("WHATSAPP_API_TOKEN", "")
 PHONE_ID     = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "")
 VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN", "inbox-digest-verify-2026")
 GEMINI_KEY   = os.environ.get("GOOGLE_API_KEY", "")
-VERCEL_URL   = os.environ.get("VERCEL_URL", "")  # auto-set by Vercel
-APP_URL      = os.environ.get("APP_URL", f"https://{VERCEL_URL}" if VERCEL_URL else "")
+VERCEL_URL   = os.environ.get("VERCEL_URL", "")  # auto-set by Vercel (deployment-specific)
+# VERCEL_PROJECT_PRODUCTION_URL is set to the stable alias by Vercel
+_STABLE_URL  = os.environ.get("VERCEL_PROJECT_PRODUCTION_URL", "")
+APP_URL      = os.environ.get("APP_URL",
+               f"https://{_STABLE_URL}" if _STABLE_URL else
+               f"https://{VERCEL_URL}" if VERCEL_URL else "")
 
 # Gmail OAuth
 GMAIL_CLIENT_ID     = os.environ.get("OAUTH_CLIENT_ID", "")
