@@ -12,3 +12,7 @@ docs/
 deployment/
 *.md
 !README.md
+uv.lock
+pyproject.toml
+inbox-digest.egg-info/
+.python-version

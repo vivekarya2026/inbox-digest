@@ -415,3 +415,7 @@ async def receive(request: Request):
 async def health():
     return {"status": "ok", "version": "1.0.0",
             "appwrite": bool(AW_PROJECT_ID), "app_url": APP_URL}
+
+# Vercel serverless handler
+from mangum import Mangum
+handler = Mangum(app, lifespan="off")
