@@ -1,0 +1,24 @@
+# Secrets — never commit
+.env
+gmail_token.json
+gmail_client_secret.json
+*.json.bak
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+dist/
+.pytest_cache/
+
+# Vercel
+.vercel/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+nohup.out

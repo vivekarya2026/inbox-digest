@@ -1,0 +1,68 @@
+{
+  "colorGroups": [
+    {
+      "query": "tag:#module/app",
+      "color": { "a": 1, "rgb": 4478975 }
+    },
+    {
+      "query": "tag:#module/tools",
+      "color": { "a": 1, "rgb": 16744272 }
+    },
+    {
+      "query": "tag:#module/store",
+      "color": { "a": 1, "rgb": 8388736 }
+    },
+    {
+      "query": "tag:#infra/terraform",
+      "color": { "a": 1, "rgb": 6579300 }
+    },
+    {
+      "query": "tag:#infra/gcp",
+      "color": { "a": 1, "rgb": 16744272 }
+    },
+    {
+      "query": "tag:#external/api",
+      "color": { "a": 1, "rgb": 16744272 }
+    },
+    {
+      "query": "tag:#external/llm",
+      "color": { "a": 1, "rgb": 10053120 }
+    },
+    {
+      "query": "tag:#concept/design",
+      "color": { "a": 1, "rgb": 16765952 }
+    },
+    {
+      "query": "tag:#eval",
+      "color": { "a": 1, "rgb": 10026496 }
+    },
+    {
+      "query": "tag:#MOC",
+      "color": { "a": 1, "rgb": 16711680 }
+    },
+    {
+      "query": "tag:#service",
+      "color": { "a": 1, "rgb": 255 }
+    }
+  ],
+  "showTags": false,
+  "showAttachments": false,
+  "hideUnresolved": false,
+  "showOrphans": true,
+  "collapse-filter": true,
+  "search": "",
+  "showArrow": true,
+  "textFadeMultiplier": 0,
+  "nodeSizeMultiplier": 1.5,
+  "lineSizeMultiplier": 1,
+  "centerStrength": 0.518713248970312,
+  "repelStrength": 14,
+  "linkStrength": 1,
+  "linkDistance": 30,
+  "scale": 1.4,
+  "close": false,
+  "collapse-color-groups": false,
+  "collapse-display": false,
+  "collapse-forces": false,
+  "collapse-existing-filter": false
+}

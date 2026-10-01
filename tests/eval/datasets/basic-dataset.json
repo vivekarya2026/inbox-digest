@@ -1,0 +1,88 @@
+{
+  "eval_cases": [
+    {
+      "eval_case_id": "case_01_urgent_and_promo",
+      "prompt": {
+        "role": "user",
+        "parts": [{
+          "text": "Run the inbox digest for this test inbox. The tool state already has a gmail_token. Use the following mock emails (inject as state['mock_emails'] = [...]):\n[\n  {\"id\":\"msg001\",\"subject\":\"[URGENT] Server outage - need your response NOW\",\"from\":\"ops@yourcompany.com\",\"date\":\"Wed, 30 Sep 2026 10:05:00 UTC\",\"snippet\":\"Production is down, everyone is waiting on your config change. Please respond ASAP.\",\"body_preview\":\"Hey Vivek, production is down and we are all blocked. The config change is waiting on your sign-off. Please respond ASAP — every minute costs $500.\",\"labels\":[\"INBOX\",\"UNREAD\"]},\n  {\"id\":\"msg002\",\"subject\":\"50% off your next purchase - today only!\",\"from\":\"deals@shopify-merchant.com\",\"date\":\"Wed, 30 Sep 2026 09:00:00 UTC\",\"snippet\":\"Flash sale ends midnight! Don't miss out.\",\"body_preview\":\"Your exclusive flash sale is live. Shop now for 50% off everything.\",\"labels\":[\"INBOX\",\"UNREAD\",\"CATEGORY_PROMOTIONS\"]},\n  {\"id\":\"msg003\",\"subject\":\"You have a new connection on LinkedIn\",\"from\":\"notifications@linkedin.com\",\"date\":\"Wed, 30 Sep 2026 08:30:00 UTC\",\"snippet\":\"John Smith accepted your connection request.\",\"body_preview\":\"John Smith accepted your connection request on LinkedIn.\",\"labels\":[\"INBOX\",\"UNREAD\",\"CATEGORY_SOCIAL\"]},\n  {\"id\":\"msg004\",\"subject\":\"Invoice #2026-089 due in 3 days\",\"from\":\"billing@cloudprovider.io\",\"date\":\"Wed, 30 Sep 2026 07:00:00 UTC\",\"snippet\":\"Your invoice for $1,240.00 is due on October 3rd.\",\"body_preview\":\"Invoice #2026-089 for $1,240.00 is due on October 3rd, 2026. Please pay to avoid service interruption.\",\"labels\":[\"INBOX\",\"UNREAD\"]}\n]"
+        }]
+      },
+      "metadata": {
+        "scenario_description": "Inbox with: 1 urgent P1 (server outage requiring immediate action), 1 promotional email, 1 social notification, 1 financial P2 (invoice due in 3 days). The agent should filter out promo and social, include msg001 as P1 and msg004 as P2.",
+        "expected_behavior": "Send digest with msg001 as P1 (action_needed, urgent), msg004 as P2 (financial_legal, important). msg002 and msg003 excluded. send=true, p1_count=1, p2_count=1.",
+        "expected_silence": false
+      }
+    },
+    {
+      "eval_case_id": "case_02_all_noise",
+      "prompt": {
+        "role": "user",
+        "parts": [{
+          "text": "Run the inbox digest. Mock emails:\n[\n  {\"id\":\"msg010\",\"subject\":\"Your weekly newsletter\",\"from\":\"hello@substack.com\",\"date\":\"Wed, 30 Sep 2026 10:00:00 UTC\",\"snippet\":\"This week in tech...\",\"body_preview\":\"This week in tech: AI, startups, and more.\",\"labels\":[\"INBOX\",\"UNREAD\",\"CATEGORY_PROMOTIONS\"]},\n  {\"id\":\"msg011\",\"subject\":\"New comment on your photo\",\"from\":\"notify@instagram.com\",\"date\":\"Wed, 30 Sep 2026 09:00:00 UTC\",\"snippet\":\"@user liked your photo.\",\"body_preview\":\"@user liked your photo on Instagram.\",\"labels\":[\"INBOX\",\"UNREAD\",\"CATEGORY_SOCIAL\"]},\n  {\"id\":\"msg012\",\"subject\":\"GitHub: new stars on your repo\",\"from\":\"noreply@github.com\",\"date\":\"Wed, 30 Sep 2026 08:00:00 UTC\",\"snippet\":\"Your repo got 5 new stars.\",\"body_preview\":\"inbox-digest got 5 new stars.\",\"labels\":[\"INBOX\",\"UNREAD\"]}\n]"
+        }]
+      },
+      "metadata": {
+        "scenario_description": "Inbox with: newsletter (promo), Instagram social notification, GitHub star notification (bulk sender domain). All should be filtered. No P1/P2 should exist.",
+        "expected_behavior": "No digest sent. status=skipped, reason=no_important_emails or inbox_empty, sent=false.",
+        "expected_silence": true
+      }
+    },
+    {
+      "eval_case_id": "case_03_meeting_today",
+      "prompt": {
+        "role": "user",
+        "parts": [{
+          "text": "Run the inbox digest. Mock emails:\n[\n  {\"id\":\"msg020\",\"subject\":\"Meeting invite: Q4 planning - TODAY 2pm\",\"from\":\"cto@yourcompany.com\",\"date\":\"Wed, 30 Sep 2026 08:00:00 UTC\",\"snippet\":\"Vivek, I'm adding you to today's Q4 planning session at 2pm. Please confirm attendance.\",\"body_preview\":\"Hi Vivek, please join today's Q4 planning session at 2:00pm PST. We need your input on infrastructure budget. Please confirm by noon. Zoom link: zoom.us/j/12345.\",\"labels\":[\"INBOX\",\"UNREAD\"]},\n  {\"id\":\"msg021\",\"subject\":\"Re: Project Alpha — waiting on your review\",\"from\":\"designer@yourcompany.com\",\"date\":\"Wed, 30 Sep 2026 09:30:00 UTC\",\"snippet\":\"Hey, I sent you the designs last Tuesday. Any feedback? The client presentation is Friday.\",\"body_preview\":\"Hi Vivek, just following up on the Project Alpha designs I sent on Tuesday. The client presentation is this Friday and I need your feedback to finalize. Can you take a look today?\",\"labels\":[\"INBOX\",\"UNREAD\"]},\n  {\"id\":\"msg022\",\"subject\":\"Team lunch reminder\",\"from\":\"office@yourcompany.com\",\"date\":\"Wed, 30 Sep 2026 07:00:00 UTC\",\"snippet\":\"Just a reminder that team lunch is today at 12:30pm.\",\"body_preview\":\"Team lunch today at 12:30pm at the usual spot. See you there!\",\"labels\":[\"INBOX\",\"UNREAD\"]}\n]"
+        }]
+      },
+      "metadata": {
+        "scenario_description": "Inbox with: today's meeting invite (P1, scheduling, needs confirm), design review request with Friday deadline (P2, action_needed), team lunch reminder (P3 or P2 informational).",
+        "expected_behavior": "Send digest. msg020=P1 (scheduling_calendar, action: Confirm attendance), msg021=P2 (action_needed, action: Review designs before Friday). msg022 may be P2 or P3. sent=true, p1_count>=1.",
+        "expected_silence": false
+      }
+    },
+    {
+      "eval_case_id": "case_04_personal_and_financial",
+      "prompt": {
+        "role": "user",
+        "parts": [{
+          "text": "Run the inbox digest. Mock emails:\n[\n  {\"id\":\"msg030\",\"subject\":\"URGENT: Your account will be suspended\",\"from\":\"noreply@netflix.com\",\"date\":\"Wed, 30 Sep 2026 10:00:00 UTC\",\"snippet\":\"Update your payment method to avoid service interruption.\",\"body_preview\":\"Your Netflix payment failed. Update your payment method within 24 hours.\",\"labels\":[\"INBOX\",\"UNREAD\"]},\n  {\"id\":\"msg031\",\"subject\":\"Hey, are you free this weekend?\",\"from\":\"friend@gmail.com\",\"date\":\"Wed, 30 Sep 2026 09:00:00 UTC\",\"snippet\":\"Thinking of doing a hiking trip Saturday, want to join?\",\"body_preview\":\"Hey Vivek! Thinking of doing a hiking trip on Saturday. Would you want to join? Let me know by Thursday so I can plan.\",\"labels\":[\"INBOX\",\"UNREAD\"]},\n  {\"id\":\"msg032\",\"subject\":\"Contract renewal - please sign by Oct 5\",\"from\":\"legal@partner-company.com\",\"date\":\"Wed, 30 Sep 2026 08:00:00 UTC\",\"snippet\":\"Hi Vivek, the annual contract is attached. Please sign and return by October 5th.\",\"body_preview\":\"Hi Vivek, please find the attached annual services contract. Please sign and return via DocuSign by October 5th, 2026 to avoid service disruption.\",\"labels\":[\"INBOX\",\"UNREAD\"]}\n]"
+        }]
+      },
+      "metadata": {
+        "scenario_description": "Inbox with: Netflix payment warning (financial P2 — real but not urgent in 24h), personal invite from friend (personal P2), contract renewal needing signature by Oct 5 (financial_legal P1 or P2).",
+        "expected_behavior": "Send digest. msg030=P2 (financial_legal, action: Update Netflix payment). msg031=P2 (personal, action: Reply by Thursday). msg032=P1 or P2 (financial_legal, action: Sign contract by Oct 5). All three included. sent=true.",
+        "expected_silence": false
+      }
+    },
+    {
+      "eval_case_id": "case_05_empty_inbox",
+      "prompt": {
+        "role": "user",
+        "parts": [{
+          "text": "Run the inbox digest. The inbox is empty — fetch_unread_emails returns {\"status\": \"success\", \"emails\": [], \"total_fetched\": 0, \"total_after_filter\": 0}."
+        }]
+      },
+      "metadata": {
+        "scenario_description": "Completely empty inbox. No unread messages. Agent must not send anything.",
+        "expected_behavior": "No digest sent. status=skipped, reason=inbox_empty or no_important_emails, sent=false.",
+        "expected_silence": true
+      }
+    },
+    {
+      "eval_case_id": "case_06_mixed_bulk_and_real",
+      "prompt": {
+        "role": "user",
+        "parts": [{
+          "text": "Run the inbox digest. Mock emails:\n[\n  {\"id\":\"msg040\",\"subject\":\"Your order has shipped\",\"from\":\"ship-confirm@amazon.com\",\"date\":\"Wed, 30 Sep 2026 11:00:00 UTC\",\"snippet\":\"Your order #123-4567890 has shipped.\",\"body_preview\":\"Your Amazon order #123-4567890 has shipped and will arrive Friday.\",\"labels\":[\"INBOX\",\"UNREAD\"]},\n  {\"id\":\"msg041\",\"subject\":\"Weekly digest: Hacker News\",\"from\":\"weekly@hackernewsletter.com\",\"date\":\"Wed, 30 Sep 2026 06:00:00 UTC\",\"snippet\":\"Top stories this week...\",\"body_preview\":\"Top stories from Hacker News this week.\",\"labels\":[\"INBOX\",\"UNREAD\"]},\n  {\"id\":\"msg042\",\"subject\":\"Can you join the 3pm call today?\",\"from\":\"manager@yourcompany.com\",\"date\":\"Wed, 30 Sep 2026 10:30:00 UTC\",\"snippet\":\"Need you for the client call at 3pm. Quick 30min.\",\"body_preview\":\"Hey Vivek, can you join the client call at 3pm today? It's a quick 30-minute check-in and the client is specifically asking for you. Please confirm ASAP.\",\"labels\":[\"INBOX\",\"UNREAD\"]}\n]"
+        }]
+      },
+      "metadata": {
+        "scenario_description": "Mix of: Amazon shipment (bulk sender — should be filtered), Hacker News newsletter (should be filtered), and a manager's meeting request for today (P1). Only the meeting request should pass.",
+        "expected_behavior": "msg040 and msg041 filtered out (bulk senders / newsletter). msg042=P1 (scheduling_calendar, action: Confirm 3pm call). sent=true, p1_count=1, p2_count=0.",
+        "expected_silence": false
+      }
+    }
+  ]
+}

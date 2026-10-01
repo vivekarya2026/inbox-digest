@@ -1,0 +1,53 @@
+metrics_to_run:
+  - custom_response_quality
+  - agent_turn_count
+
+custom_metrics:
+  # LLM-as-judge evaluating: filter accuracy, priority accuracy, digest quality.
+  # Runs in-process via google-genai (ADC or GEMINI_API_KEY).
+  - name: custom_response_quality
+    custom_function_file: response_quality.py
+
+  - name: agent_turn_count
+    custom_function: |
+      def evaluate(instance):
+          turns = (instance.get("agent_data") or {}).get("turns", [])
+          return {'score': len(turns)}
+
+  # Count of "sent": true in response — should be 1 for important cases
+  - name: sent_digest
+    custom_function: |
+      import json
+      def evaluate(instance):
+          resp_text = ""
+          try:
+              turns = (instance.get("agent_data") or {}).get("turns", [])
+              for turn in turns:
+                  for part in (turn.get("response", {}) or {}).get("parts", []):
+                      resp_text += (part.get("text") or "")
+              data = json.loads(resp_text) if resp_text.strip().startswith("{") else {}
+              sent = 1 if data.get("sent") else 0
+          except Exception:
+              sent = 0
+          return {"score": sent}
+
+  # Check no send when inbox only has P3/filtered mail
+  - name: silence_when_unimportant
+    custom_function: |
+      import json
+      def evaluate(instance):
+          # Only applies to cases tagged "expected_silence": true
+          if not instance.get("metadata", {}).get("expected_silence"):
+              return {"score": 1}  # N/A
+          resp_text = ""
+          try:
+              turns = (instance.get("agent_data") or {}).get("turns", [])
+              for turn in turns:
+                  for part in (turn.get("response", {}) or {}).get("parts", []):
+                      resp_text += (part.get("text") or "")
+              data = json.loads(resp_text) if resp_text.strip().startswith("{") else {}
+              # Pass (score=1) if agent did NOT send
+              score = 1 if not data.get("sent") else 0
+          except Exception:
+              score = 0
+          return {"score": score}

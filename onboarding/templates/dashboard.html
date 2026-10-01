@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inbox Digest — Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         background: #f8f9fa; color: #212529; min-height: 100vh;
+         display: flex; align-items: center; justify-content: center; }
+  .card { background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,.08);
+          padding: 40px 48px; max-width: 520px; width: 90%; }
+  h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 6px; }
+  .subtitle { color: #6c757d; margin-bottom: 28px; font-size: .9rem; }
+  .row { display: flex; justify-content: space-between; padding: 12px 0;
+          border-bottom: 1px solid #f0f0f0; font-size: .92rem; }
+  .row:last-of-type { border-bottom: none; }
+  .label { color: #6c757d; }
+  .badge-active { background: #d4edda; color: #155724; padding: 3px 10px;
+                   border-radius: 12px; font-size: .82rem; font-weight: 600; }
+  .badge-paused { background: #f8d7da; color: #721c24; padding: 3px 10px;
+                   border-radius: 12px; font-size: .82rem; font-weight: 600; }
+  .badge-reauth { background: #fff3cd; color: #856404; padding: 3px 10px;
+                   border-radius: 12px; font-size: .82rem; font-weight: 600; }
+  .actions { margin-top: 28px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn { padding: 10px 20px; border-radius: 8px; font-size: .9rem; font-weight: 600;
+          cursor: pointer; border: none; text-decoration: none; display: inline-block; }
+  .btn-primary { background: #4285F4; color: #fff; }
+  .btn-danger  { background: #dc3545; color: #fff; }
+  .btn-outline { background: #fff; color: #495057; border: 1px solid #ced4da; }
+  .reauth-banner { background: #fff3cd; border-radius: 8px; padding: 14px 16px;
+                    font-size: .88rem; color: #856404; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div style="font-size:2.5rem;margin-bottom:8px">📊</div>
+  <h1>Your Dashboard</h1>
+  <p class="subtitle">{{ user_email }}</p>
+
+  {% if needs_reauth %}
+  <div class="reauth-banner">
+    ⚠️ <strong>Re-authentication needed.</strong> Your Gmail access was revoked.
+    <a href="/auth/login" style="color:#856404">Re-connect Gmail →</a>
+  </div>
+  {% endif %}
+
+  <div class="row">
+    <span class="label">Status</span>
+    {% if needs_reauth %}
+      <span class="badge-reauth">Needs re-auth</span>
+    {% elif active %}
+      <span class="badge-active">Active ✓</span>
+    {% else %}
+      <span class="badge-paused">Paused</span>
+    {% endif %}
+  </div>
+  <div class="row">
+    <span class="label">WhatsApp</span>
+    <span>{{ whatsapp_number }}</span>
+  </div>
+  <div class="row">
+    <span class="label">AI Provider</span>
+    <span>{{ llm_provider }} / {{ llm_model }}</span>
+  </div>
+  <div class="row">
+    <span class="label">Schedule</span>
+    <span>Every hour (UTC)</span>
+  </div>
+  <div class="row">
+    <span class="label">Last run</span>
+    <span>{{ last_run_at }}</span>
+  </div>
+
+  <div class="actions">
+    <a href="/auth/login" class="btn btn-outline">Update settings</a>
+    {% if active and not needs_reauth %}
+    <form method="POST" action="/deactivate" style="display:inline">
+      <button type="submit" class="btn btn-danger"
+              onclick="return confirm('Pause your hourly digest?')">Pause</button>
+    </form>
+    {% endif %}
+    <a href="/" class="btn btn-outline">← Home</a>
+  </div>
+</div>
+</body>
+</html>

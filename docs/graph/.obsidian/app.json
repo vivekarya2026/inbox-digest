@@ -1,0 +1,19 @@
+{
+  "promptDelete": false,
+  "legacyEditor": false,
+  "livePreview": true,
+  "defaultViewMode": "preview",
+  "vimMode": false,
+  "tabSize": 2,
+  "useTab": false,
+  "showLineNumber": false,
+  "showIndentGuide": true,
+  "foldHeading": false,
+  "foldIndent": false,
+  "pdfExportSettings": {
+    "pageSize": "letter",
+    "landscape": false,
+    "margin": "none",
+    "downscaleEmbeddedImages": true
+  }
+}

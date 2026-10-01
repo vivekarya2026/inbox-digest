@@ -1,0 +1,17 @@
+{
+  "theme": "obsidian",
+  "accentColor": "",
+  "interfaceFontFamily": "",
+  "textFontFamily": "",
+  "monospaceFontFamily": "",
+  "baseFontSize": 16,
+  "baseFontSizeAction": false,
+  "disableMenuAnimations": false,
+  "nativeMenus": null,
+  "showViewHeader": false,
+  "focusNewTab": true,
+  "defaultNewTabView": null,
+  "translucency": false,
+  "nativeTitleBar": false,
+  "tabsStyle": "stacked"
+}

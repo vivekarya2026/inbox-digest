@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inbox Digest — Setup</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         background: #f8f9fa; color: #212529; min-height: 100vh;
+         display: flex; align-items: center; justify-content: center; }
+  .card { background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,.08);
+          padding: 40px 48px; max-width: 520px; width: 90%; }
+  h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 6px; }
+  .subtitle { color: #6c757d; margin-bottom: 32px; font-size: .95rem; }
+  .form-group { margin-bottom: 20px; }
+  label { display: block; font-weight: 600; margin-bottom: 6px; font-size: .9rem; }
+  .hint { color: #6c757d; font-size: .82rem; margin-top: 4px; }
+  input, select { width: 100%; padding: 10px 14px; border: 1px solid #ced4da;
+                  border-radius: 6px; font-size: .95rem; color: #212529; }
+  input:focus, select:focus { outline: none; border-color: #4285F4; box-shadow: 0 0 0 3px rgba(66,133,244,.15); }
+  .btn { background: #4285F4; color: #fff; padding: 12px 28px; border: none;
+         border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; width: 100%; margin-top: 8px; }
+  .btn:hover { background: #1a73e8; }
+  .error { background: #fff3cd; border: 1px solid #ffc107; color: #856404;
+            padding: 12px 16px; border-radius: 6px; margin-bottom: 20px; font-size: .9rem; }
+  .security-note { background: #e8f5e9; border-radius: 8px; padding: 14px 16px;
+                    font-size: .85rem; color: #2e7d32; margin-top: 20px; }
+  .user-badge { background: #e3f2fd; border-radius: 6px; padding: 8px 14px;
+                font-size: .88rem; color: #1565c0; margin-bottom: 24px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div style="font-size:2.5rem;margin-bottom:8px">⚙️</div>
+  <h1>Set up Inbox Digest</h1>
+  <p class="subtitle">One-time configuration. You can update these at any time.</p>
+
+  <div class="user-badge">📧 Signed in as {{ user_email }}</div>
+
+  {% if error %}
+  <div class="error">⚠️ {{ error }}</div>
+  {% endif %}
+
+  <form method="POST" action="/setup">
+    <div class="form-group">
+      <label for="whatsapp_number">📱 Your WhatsApp Number</label>
+      <input type="tel" id="whatsapp_number" name="whatsapp_number"
+             placeholder="+14155551234" required pattern="^\+[0-9]{7,15}$">
+      <div class="hint">Include country code, e.g. +1 for US, +44 for UK, +91 for India.</div>
+    </div>
+
+    <div class="form-group">
+      <label for="llm_provider">🤖 Your AI Provider</label>
+      <select id="llm_provider" name="llm_provider" onchange="updateModelDefault(this.value)">
+        {% for p in providers %}
+        <option value="{{ p.value }}">{{ p.label }}</option>
+        {% endfor %}
+      </select>
+      <div class="hint">Your API key is encrypted and only used for your summaries.</div>
+    </div>
+
+    <div class="form-group">
+      <label for="llm_model">🧠 Model Name</label>
+      <input type="text" id="llm_model" name="llm_model"
+             value="{{ default_models.gemini }}" required>
+      <div class="hint">
+        Gemini: <code>gemini-3.8-flash</code> &nbsp;|&nbsp;
+        OpenAI: <code>gpt-4o-mini</code> &nbsp;|&nbsp;
+        Anthropic: <code>claude-haiku-4-20250514</code>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="llm_api_key">🔑 API Key</label>
+      <input type="password" id="llm_api_key" name="llm_api_key"
+             placeholder="sk-... / AIza... / your-api-key" required autocomplete="new-password">
+      <div class="hint">Encrypted with Cloud KMS before storage. Never logged or shared.</div>
+    </div>
+
+    <button type="submit" class="btn">Start Inbox Digest →</button>
+
+    <div class="security-note">
+      🔒 <strong>Privacy:</strong> We only read your inbox (never modify or send). Your API key
+      is encrypted at rest and decrypted only during your hourly digest run.
+    </div>
+  </form>
+</div>
+
+<script>
+const models = {{ default_models | tojson }};
+function updateModelDefault(provider) {
+  const modelInput = document.getElementById('llm_model');
+  if (models[provider]) modelInput.value = models[provider];
+}
+</script>
+</body>
+</html>
