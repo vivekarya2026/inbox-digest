@@ -6,5 +6,5 @@ google-auth==2.38.0
 google-auth-oauthlib==1.2.1
 google-api-python-client==2.165.0
 google-genai==1.14.0
-appwrite==7.0.0
+appwrite==7.0.1
 mangum==0.19.0
