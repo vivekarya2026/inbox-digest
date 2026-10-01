@@ -69,10 +69,16 @@ def _appwrite_client() -> Client:
 
 def _get_user(email: str) -> dict | None:
     try:
-        db  = Databases(_appwrite_client())
-        res = db.list_documents(AW_DB_ID, AW_COL_USERS,
-                                queries=[Query.equal("email", email)])
-        docs = res.get("documents", [])
+        # ponytail: vendored Appwrite SDK sends GET-with-body which Vercel rejects
+        # ("request cannot have request body"); use REST directly via httpx instead.
+        import urllib.parse
+        q = urllib.parse.quote(json.dumps({"method": "equal", "attribute": "email", "values": [email]}))
+        url = f"{AW_ENDPOINT}/databases/{AW_DB_ID}/collections/{AW_COL_USERS}/documents?queries[]={q}"
+        r = httpx.get(url, headers={
+            "X-Appwrite-Project": AW_PROJECT_ID,
+            "X-Appwrite-Key": AW_API_KEY,
+        }, timeout=15)
+        docs = r.json().get("documents", [])
         return docs[0] if docs else None
     except Exception as e:
         log.error(f"Appwrite get_user error: {e}")
@@ -80,33 +86,44 @@ def _get_user(email: str) -> dict | None:
 
 def _save_token(email: str, token_json: str, wa_number: str = "", raise_on_error: bool = False) -> None:
     try:
-        db  = Databases(_appwrite_client())
-        existing = _get_user(email)
-        data = {
-            "email":        email,
-            "gmail_token":  token_json,
-            "wa_number":    wa_number,
-            "updated_at":   datetime.now(timezone.utc).isoformat(),
+        headers = {
+            "X-Appwrite-Project": AW_PROJECT_ID,
+            "X-Appwrite-Key": AW_API_KEY,
+            "Content-Type": "application/json",
         }
+        data = {
+            "email":       email,
+            "gmail_token": token_json,
+            "wa_number":   wa_number,
+            "updated_at":  datetime.now(timezone.utc).isoformat(),
+        }
+        base = f"{AW_ENDPOINT}/databases/{AW_DB_ID}/collections/{AW_COL_USERS}/documents"
+        existing = _get_user(email)
         if existing:
-            db.update_document(AW_DB_ID, AW_COL_USERS, existing["$id"], data)
+            r = httpx.patch(f"{base}/{existing['$id']}",
+                            headers=headers, json={"data": data}, timeout=15)
         else:
-            db.create_document(AW_DB_ID, AW_COL_USERS, ID.unique(), data)
+            r = httpx.post(base, headers=headers,
+                           json={"documentId": "unique()", "data": data}, timeout=15)
+        if r.status_code >= 400:
+            raise RuntimeError(f"Appwrite {r.status_code}: {r.text[:200]}")
         log.info(f"Token saved for {email}")
     except Exception as e:
         log.error(f"Appwrite save_token error: {e}")
-        # #region agent log
         if raise_on_error:
             raise
-        # #endregion
 
 def _get_token_for_number(wa_number: str) -> str | None:
     """Find Gmail token for a WhatsApp number."""
     try:
-        db  = Databases(_appwrite_client())
-        res = db.list_documents(AW_DB_ID, AW_COL_USERS,
-                                queries=[Query.equal("wa_number", wa_number)])
-        docs = res.get("documents", [])
+        import urllib.parse
+        q = urllib.parse.quote(json.dumps({"method": "equal", "attribute": "wa_number", "values": [wa_number]}))
+        url = f"{AW_ENDPOINT}/databases/{AW_DB_ID}/collections/{AW_COL_USERS}/documents?queries[]={q}"
+        r = httpx.get(url, headers={
+            "X-Appwrite-Project": AW_PROJECT_ID,
+            "X-Appwrite-Key": AW_API_KEY,
+        }, timeout=15)
+        docs = r.json().get("documents", [])
         return docs[0].get("gmail_token") if docs else None
     except Exception as e:
         log.error(f"Appwrite get_token error: {e}")
@@ -494,23 +511,14 @@ async def debug_selftest():
     }
     # Stage 1: Appwrite client + list (hypothesis A)
     try:
-        db = Databases(_appwrite_client())
-        res = db.list_documents(AW_DB_ID, AW_COL_USERS,
-                                queries=[Query.equal("email", "selftest@example.com")])
-        result["stages"]["appwrite_list"] = {"ok": True, "total": res.get("total", 0)}
+        res = _get_user("selftest@example.com")
+        result["stages"]["appwrite_list"] = {"ok": True, "found": bool(res)}
     except Exception as e:
         result["stages"]["appwrite_list"] = {"ok": False, "error": str(e), "tb": _tb.format_exc()[-500:]}
         return result
     # Stage 2: Appwrite write (hypothesis E - attribute/size)
     try:
-        existing = _get_user("selftest@example.com")
-        data = {"email": "selftest@example.com", "gmail_token": "x"*100,
-                "wa_number": "0000000000",
-                "updated_at": datetime.now(timezone.utc).isoformat()}
-        if existing:
-            db.update_document(AW_DB_ID, AW_COL_USERS, existing["$id"], data)
-        else:
-            db.create_document(AW_DB_ID, AW_COL_USERS, ID.unique(), data)
+        _save_token("selftest@example.com", "x"*100, "0000000000", raise_on_error=True)
         result["stages"]["appwrite_write"] = {"ok": True}
     except Exception as e:
         result["stages"]["appwrite_write"] = {"ok": False, "error": str(e), "tb": _tb.format_exc()[-500:]}
