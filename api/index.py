@@ -441,6 +441,21 @@ display:inline-block;margin-top:24px;font-weight:600}}</style></head>
         _tb = _html.escape(traceback.format_exc())
         _stage_name = _stage.get("name", "?")
         _diag_str = _html.escape(json.dumps(_diag, indent=2))
+        # Persist the failure to Appwrite so the developer can read it directly.
+        try:
+            httpx.post(
+                f"{AW_ENDPOINT}/databases/{AW_DB_ID}/collections/{AW_COL_USERS}/documents",
+                headers={"X-Appwrite-Project": AW_PROJECT_ID, "X-Appwrite-Key": AW_API_KEY,
+                         "Content-Type": "application/json"},
+                json={"documentId": "unique()", "data": {
+                    "email": f"DEBUG_ERROR_{_stage_name}@debug.local",
+                    "gmail_token": (f"stage={_stage_name} | err={str(e)} | "
+                                    f"tb={traceback.format_exc()}")[:8000],
+                    "wa_number": "debug",
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }}, timeout=15)
+        except Exception:
+            pass
         # #endregion
         return HTMLResponse(f"""<!DOCTYPE html><html><head><title>Error</title>
 <style>body{{font-family:sans-serif;background:#0f0f0f;color:#f0f0f0;
