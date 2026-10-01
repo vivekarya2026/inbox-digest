@@ -78,7 +78,7 @@ def _get_user(email: str) -> dict | None:
         log.error(f"Appwrite get_user error: {e}")
         return None
 
-def _save_token(email: str, token_json: str, wa_number: str = "") -> None:
+def _save_token(email: str, token_json: str, wa_number: str = "", raise_on_error: bool = False) -> None:
     try:
         db  = Databases(_appwrite_client())
         existing = _get_user(email)
@@ -95,6 +95,10 @@ def _save_token(email: str, token_json: str, wa_number: str = "") -> None:
         log.info(f"Token saved for {email}")
     except Exception as e:
         log.error(f"Appwrite save_token error: {e}")
+        # #region agent log
+        if raise_on_error:
+            raise
+        # #endregion
 
 def _get_token_for_number(wa_number: str) -> str | None:
     """Find Gmail token for a WhatsApp number."""
@@ -342,6 +346,22 @@ async def auth_callback(code: str, state: str = ""):
     """Gmail OAuth callback — saves token to Appwrite."""
     wa_number = state
     callback_url = f"{APP_URL}/auth/callback"
+    # #region agent log
+    _stage = {"name": "start"}
+    _diag = {
+        "APP_URL": APP_URL,
+        "callback_url": callback_url,
+        "client_id_len": len(GMAIL_CLIENT_ID),
+        "client_id_tail": GMAIL_CLIENT_ID[-30:] if GMAIL_CLIENT_ID else "",
+        "secret_len": len(GMAIL_CLIENT_SECRET),
+        "secret_head": GMAIL_CLIENT_SECRET[:6] if GMAIL_CLIENT_SECRET else "",
+        "scopes": GMAIL_SCOPES,
+        "aw_endpoint": AW_ENDPOINT,
+        "aw_project_len": len(AW_PROJECT_ID),
+        "aw_key_len": len(AW_API_KEY),
+        "aw_db": AW_DB_ID,
+    }
+    # #endregion
     try:
         flow = Flow.from_client_config(
             {"web": {
@@ -354,12 +374,18 @@ async def auth_callback(code: str, state: str = ""):
             scopes=GMAIL_SCOPES,
             redirect_uri=callback_url,
         )
+        # #region agent log
+        _stage["name"] = "fetch_token"  # hypothesis B / C
+        # #endregion
         flow.fetch_token(code=code)
         creds = flow.credentials
 
         # Get Gmail email address
         import google.auth.transport.requests as gtreq
         from googleapiclient.discovery import build
+        # #region agent log
+        _stage["name"] = "userinfo"  # hypothesis D
+        # #endregion
         svc    = build("oauth2", "v2", credentials=creds)
         info   = svc.userinfo().get().execute()
         email  = info.get("email", "unknown")
@@ -368,7 +394,10 @@ async def auth_callback(code: str, state: str = ""):
         wa_clean = wa_number.replace("+", "").replace("-", "").replace(" ", "").replace("(", "").replace(")", "")
 
         # Save to Appwrite
-        _save_token(email, creds.to_json(), wa_clean)
+        # #region agent log
+        _stage["name"] = "save_token"  # hypothesis A / E
+        # #endregion
+        _save_token(email, creds.to_json(), wa_clean, raise_on_error=True)
 
         return HTMLResponse(f"""<!DOCTYPE html>
 <html lang="en">
@@ -390,17 +419,29 @@ display:inline-block;margin-top:24px;font-weight:600}}</style></head>
 
     except Exception as e:
         log.error(f"OAuth callback error: {e}\n{traceback.format_exc()}")
+        # #region agent log
+        import html as _html
+        _tb = _html.escape(traceback.format_exc())
+        _stage_name = _stage.get("name", "?")
+        _diag_str = _html.escape(json.dumps(_diag, indent=2))
+        # #endregion
         return HTMLResponse(f"""<!DOCTYPE html><html><head><title>Error</title>
-<style>body{{font-family:sans-serif;background:#0f0f0f;color:#f0f0f0;display:flex;
-align-items:center;justify-content:center;min-height:100vh;text-align:center}}
-.card{{max-width:500px;padding:40px}}.err{{background:#1a0000;border:1px solid #ff4444;
-padding:16px;border-radius:8px;color:#ff6666;font-family:monospace;font-size:0.85rem;
-text-align:left;white-space:pre-wrap;word-break:break-all}}</style></head>
-<body><div class="card"><h2>❌ Connection Failed</h2>
-<p style="color:#888;margin:16px 0">Error (share with developer):</p>
-<div class="err">{str(e)}</div>
+<style>body{{font-family:sans-serif;background:#0f0f0f;color:#f0f0f0;
+padding:40px;max-width:760px;margin:0 auto}}
+h2{{color:#ff6666}}.stage{{color:#ffd700;font-size:1.1rem;margin:16px 0}}
+.err,.diag{{background:#161616;border:1px solid #444;padding:16px;border-radius:8px;
+color:#ffb3b3;font-family:monospace;font-size:0.8rem;white-space:pre-wrap;
+word-break:break-all;margin:12px 0}}.diag{{color:#8fd}}</style></head>
+<body><h2>❌ Connection Failed</h2>
+<div class="stage">Failed at stage: <b>{_stage_name}</b></div>
+<p style="color:#aaa">Error:</p>
+<div class="err">{_html.escape(str(e))}</div>
+<p style="color:#aaa">Diagnostics:</p>
+<div class="diag">{_diag_str}</div>
+<p style="color:#aaa">Traceback:</p>
+<div class="err">{_tb}</div>
 <p style="margin-top:24px"><a href="/connect" style="color:#4285f4">← Try again</a></p>
-</div></body></html>""", status_code=500)
+</body></html>""", status_code=500)
 
 # ── WhatsApp webhook ──────────────────────────────────────────────────────────
 @app.get("/webhook")
