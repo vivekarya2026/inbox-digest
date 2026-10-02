@@ -15,17 +15,17 @@ import os
 import traceback
 from datetime import datetime, timezone
 
+# Relax oauthlib's strict scope check — Google broadens scopes via
+# include_granted_scopes, which otherwise triggers invalid_grant at fetch_token.
+# Must be set before google_auth_oauthlib (oauthlib) is imported below.
+os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
+os.environ.setdefault("OAUTHLIB_IGNORE_SCOPE_CHANGE", "1")
+
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
-
-# Appwrite SDK
-from appwrite.client import Client
-from appwrite.services.databases import Databases
-from appwrite.id import ID
-from appwrite.query import Query
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("inbox-digest")
@@ -60,13 +60,6 @@ SKIP_DOMAINS = {"noreply","no-reply","mailer","newsletter","notifications",
                 "updates","donotreply","support","info","hello"}
 
 # ── Appwrite helpers ──────────────────────────────────────────────────────────
-def _appwrite_client() -> Client:
-    c = Client()
-    c.set_endpoint(AW_ENDPOINT)
-    c.set_project(AW_PROJECT_ID)
-    c.set_key(AW_API_KEY)
-    return c
-
 def _get_user(email: str) -> dict | None:
     try:
         # ponytail: vendored Appwrite SDK sends GET-with-body which Vercel rejects
@@ -363,22 +356,6 @@ async def auth_callback(code: str, state: str = ""):
     """Gmail OAuth callback — saves token to Appwrite."""
     wa_number = state
     callback_url = f"{APP_URL}/auth/callback"
-    # #region agent log
-    _stage = {"name": "start"}
-    _diag = {
-        "APP_URL": APP_URL,
-        "callback_url": callback_url,
-        "client_id_len": len(GMAIL_CLIENT_ID),
-        "client_id_tail": GMAIL_CLIENT_ID[-30:] if GMAIL_CLIENT_ID else "",
-        "secret_len": len(GMAIL_CLIENT_SECRET),
-        "secret_head": GMAIL_CLIENT_SECRET[:6] if GMAIL_CLIENT_SECRET else "",
-        "scopes": GMAIL_SCOPES,
-        "aw_endpoint": AW_ENDPOINT,
-        "aw_project_len": len(AW_PROJECT_ID),
-        "aw_key_len": len(AW_API_KEY),
-        "aw_db": AW_DB_ID,
-    }
-    # #endregion
     try:
         flow = Flow.from_client_config(
             {"web": {
@@ -391,29 +368,19 @@ async def auth_callback(code: str, state: str = ""):
             scopes=GMAIL_SCOPES,
             redirect_uri=callback_url,
         )
-        # #region agent log
-        _stage["name"] = "fetch_token"  # hypothesis B / C
-        # #endregion
         flow.fetch_token(code=code)
         creds = flow.credentials
 
-        # Get Gmail email address
-        import google.auth.transport.requests as gtreq
+        # Get Gmail email address via Gmail's own getProfile (works with
+        # gmail.readonly — no extra scope needed, unlike oauth2 userinfo).
         from googleapiclient.discovery import build
-        # #region agent log
-        _stage["name"] = "userinfo"  # hypothesis D
-        # #endregion
-        svc    = build("oauth2", "v2", credentials=creds)
-        info   = svc.userinfo().get().execute()
-        email  = info.get("email", "unknown")
+        svc    = build("gmail", "v1", credentials=creds)
+        email  = svc.users().getProfile(userId="me").execute().get("emailAddress", "unknown")
 
         # Normalize WhatsApp number
         wa_clean = wa_number.replace("+", "").replace("-", "").replace(" ", "").replace("(", "").replace(")", "")
 
         # Save to Appwrite
-        # #region agent log
-        _stage["name"] = "save_token"  # hypothesis A / E
-        # #endregion
         _save_token(email, creds.to_json(), wa_clean, raise_on_error=True)
 
         return HTMLResponse(f"""<!DOCTYPE html>
@@ -436,44 +403,14 @@ display:inline-block;margin-top:24px;font-weight:600}}</style></head>
 
     except Exception as e:
         log.error(f"OAuth callback error: {e}\n{traceback.format_exc()}")
-        # #region agent log
-        import html as _html
-        _tb = _html.escape(traceback.format_exc())
-        _stage_name = _stage.get("name", "?")
-        _diag_str = _html.escape(json.dumps(_diag, indent=2))
-        # Persist the failure to Appwrite so the developer can read it directly.
-        try:
-            httpx.post(
-                f"{AW_ENDPOINT}/databases/{AW_DB_ID}/collections/{AW_COL_USERS}/documents",
-                headers={"X-Appwrite-Project": AW_PROJECT_ID, "X-Appwrite-Key": AW_API_KEY,
-                         "Content-Type": "application/json"},
-                json={"documentId": "unique()", "data": {
-                    "email": f"DEBUG_ERROR_{_stage_name}@debug.local",
-                    "gmail_token": (f"stage={_stage_name} | err={str(e)} | "
-                                    f"tb={traceback.format_exc()}")[:8000],
-                    "wa_number": "debug",
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                }}, timeout=15)
-        except Exception:
-            pass
-        # #endregion
         return HTMLResponse(f"""<!DOCTYPE html><html><head><title>Error</title>
-<style>body{{font-family:sans-serif;background:#0f0f0f;color:#f0f0f0;
-padding:40px;max-width:760px;margin:0 auto}}
-h2{{color:#ff6666}}.stage{{color:#ffd700;font-size:1.1rem;margin:16px 0}}
-.err,.diag{{background:#161616;border:1px solid #444;padding:16px;border-radius:8px;
-color:#ffb3b3;font-family:monospace;font-size:0.8rem;white-space:pre-wrap;
-word-break:break-all;margin:12px 0}}.diag{{color:#8fd}}</style></head>
-<body><h2>❌ Connection Failed</h2>
-<div class="stage">Failed at stage: <b>{_stage_name}</b></div>
-<p style="color:#aaa">Error:</p>
-<div class="err">{_html.escape(str(e))}</div>
-<p style="color:#aaa">Diagnostics:</p>
-<div class="diag">{_diag_str}</div>
-<p style="color:#aaa">Traceback:</p>
-<div class="err">{_tb}</div>
-<p style="margin-top:24px"><a href="/connect" style="color:#4285f4">← Try again</a></p>
-</body></html>""", status_code=500)
+<style>body{{font-family:-apple-system,sans-serif;background:#0f0f0f;color:#f0f0f0;
+min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center}}
+.card{{max-width:420px;padding:40px}}h2{{color:#ff6666;margin-bottom:12px}}
+p{{color:#888;line-height:1.6}}a{{color:#4285f4;display:inline-block;margin-top:20px}}</style></head>
+<body><div class="card"><h2>❌ Connection Failed</h2>
+<p>Something went wrong connecting your Gmail. Please try again.</p>
+<a href="/connect">← Try again</a></div></body></html>""", status_code=500)
 
 # ── WhatsApp webhook ──────────────────────────────────────────────────────────
 @app.get("/webhook")
@@ -503,42 +440,6 @@ async def receive(request: Request):
 async def health():
     return {"status": "ok", "version": "1.0.0",
             "appwrite": bool(AW_PROJECT_ID), "app_url": APP_URL}
-
-# #region agent log
-@app.get("/debug/selftest")
-async def debug_selftest():
-    """Debug: exercises Appwrite write path (hypotheses A/E) without OAuth."""
-    import traceback as _tb
-    result = {
-        "diag": {
-            "aw_endpoint": AW_ENDPOINT,
-            "aw_project_len": len(AW_PROJECT_ID),
-            "aw_key_len": len(AW_API_KEY),
-            "aw_db": AW_DB_ID,
-            "aw_col": AW_COL_USERS,
-            "client_id_len": len(GMAIL_CLIENT_ID),
-            "client_id_tail": GMAIL_CLIENT_ID[-30:] if GMAIL_CLIENT_ID else "",
-            "secret_len": len(GMAIL_CLIENT_SECRET),
-            "app_url": APP_URL,
-            "scopes": GMAIL_SCOPES,
-        },
-        "stages": {},
-    }
-    # Stage 1: Appwrite client + list (hypothesis A)
-    try:
-        res = _get_user("selftest@example.com")
-        result["stages"]["appwrite_list"] = {"ok": True, "found": bool(res)}
-    except Exception as e:
-        result["stages"]["appwrite_list"] = {"ok": False, "error": str(e), "tb": _tb.format_exc()[-500:]}
-        return result
-    # Stage 2: Appwrite write (hypothesis E - attribute/size)
-    try:
-        _save_token("selftest@example.com", "x"*100, "0000000000", raise_on_error=True)
-        result["stages"]["appwrite_write"] = {"ok": True}
-    except Exception as e:
-        result["stages"]["appwrite_write"] = {"ok": False, "error": str(e), "tb": _tb.format_exc()[-500:]}
-    return result
-# #endregion
 
 # Vercel serverless handler
 from mangum import Mangum
